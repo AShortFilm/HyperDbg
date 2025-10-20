@@ -171,7 +171,7 @@ ShowMessages(const char * Fmt, ...)
  */
 static void ResolveHyperDbgDevicePathA(char* outBuffer, size_t outBufferSize)
 {
-    // Default fallback
+    // Default fallback to backward-compatible static name
     strcpy_s(outBuffer, outBufferSize, HYPERDBG_USER_DEVICE_NAME);
 
     HKEY  hKey = NULL;
@@ -184,12 +184,64 @@ static void ResolveHyperDbgDevicePathA(char* outBuffer, size_t outBufferSize)
 
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, regPath, 0, KEY_READ | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
     {
+        // Primary: use the numeric suffix persisted by the driver
         if (RegQueryValueExA(hKey, "DeviceSuffix", NULL, &type, (LPBYTE)&suffix, &cbData) == ERROR_SUCCESS && type == REG_DWORD)
         {
             sprintf_s(outBuffer, outBufferSize, "%s-%04X", HYPERDBG_USER_DEVICE_NAME_BASE, suffix);
+            RegCloseKey(hKey);
+            return;
         }
+
+        // Fallback 1: use the persisted DOS device name directly if present
+        char dosName[260] = {0};
+        cbData            = sizeof(dosName);
+        type              = 0;
+        if (RegQueryValueExA(hKey, "DosDeviceName", NULL, &type, (LPBYTE)dosName, &cbData) == ERROR_SUCCESS && type == REG_SZ)
+        {
+            // Typically of the form "\\\\DosDevices\\\\RtlCoreIo-XXXX"
+            const char* tail      = dosName;
+            const char* lastSlash = strrchr(dosName, '\\');
+            if (lastSlash && lastSlash[1] != '\0')
+            {
+                tail = lastSlash + 1;
+            }
+            sprintf_s(outBuffer, outBufferSize, "\\\\.\\%s", tail);
+            RegCloseKey(hKey);
+            return;
+        }
+
         RegCloseKey(hKey);
     }
+
+    // Fallback 2: enumerate DOS device namespace and pick the first matching our randomized pattern
+    // Derive base leaf name from "\\\\.\\RtlCoreIo" -> "RtlCoreIo"
+    const char* baseLeaf  = HYPERDBG_USER_DEVICE_NAME_BASE;
+    const char* lastSlash = strrchr(baseLeaf, '\\');
+    if (lastSlash && lastSlash[1] != '\0')
+    {
+        baseLeaf = lastSlash + 1;
+    }
+
+    char  queryBuf[4096] = {0};
+    DWORD chars          = QueryDosDeviceA(NULL, queryBuf, (DWORD)sizeof(queryBuf));
+    if (chars != 0)
+    {
+        // Multi-string iteration
+        for (char* p = queryBuf; *p; p += strlen(p) + 1)
+        {
+            if (_strnicmp(p, baseLeaf, strlen(baseLeaf)) == 0)
+            {
+                // Ensure randomized form like "<base>-XXXX"
+                if (p[strlen(baseLeaf)] == '-')
+                {
+                    sprintf_s(outBuffer, outBufferSize, "\\\\.\\%s", p);
+                    return;
+                }
+            }
+        }
+    }
+
+    // If all else fails, outBuffer remains the static base (backward compatibility)
 }
 
 VOID
