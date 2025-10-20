@@ -13,6 +13,12 @@
  */
 #include "pch.h"
 
+typedef struct _HYPERKD_DEVICE_EXTENSION
+{
+    UNICODE_STRING DosDeviceName;
+    WCHAR          DosDeviceNameBuffer[64];
+} HYPERKD_DEVICE_EXTENSION, *PHYPERKD_DEVICE_EXTENSION;
+
 /**
  * @brief Main Driver Entry in the case of driver load
  *
@@ -28,11 +34,8 @@ DriverEntry(
     NTSTATUS       Ntstatus      = STATUS_SUCCESS;
     UINT64         Index         = 0;
     PDEVICE_OBJECT DeviceObject  = NULL;
-    UNICODE_STRING DriverName    = RTL_CONSTANT_STRING(HYPERDBG_KERNEL_DEVICE_NAME);
-    UNICODE_STRING DosDeviceName = RTL_CONSTANT_STRING(HYPERDBG_KERNEL_DOS_DEVICE_NAME);
-
-    UNREFERENCED_PARAMETER(RegistryPath);
-    UNREFERENCED_PARAMETER(DriverObject);
+    UNICODE_STRING DriverName    = {0};
+    UNICODE_STRING DosDeviceName = {0};
 
     //
     // Opt-in to using non-executable pool memory on Windows 8 and later.
@@ -41,10 +44,29 @@ DriverEntry(
     ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
 
     //
+    // Compose randomized device names to reduce static detectability
+    //
+    ULONG seed   = (ULONG)(__rdtsc() ^ (ULONG)(ULONG_PTR)DriverObject);
+    ULONG suffix = RtlRandomEx(&seed) & 0xFFFF;
+    if (suffix == 0)
+    {
+        suffix = 0xA001;
+    }
+
+    WCHAR DeviceNameBuffer[64]    = {0};
+    WCHAR DosDeviceNameBuffer[64] = {0};
+
+    RtlInitEmptyUnicodeString(&DriverName, DeviceNameBuffer, sizeof(DeviceNameBuffer));
+    RtlInitEmptyUnicodeString(&DosDeviceName, DosDeviceNameBuffer, sizeof(DosDeviceNameBuffer));
+
+    RtlUnicodeStringPrintf(&DriverName, L"%ws-%04X", HYPERDBG_KERNEL_DEVICE_NAME_BASE, suffix);
+    RtlUnicodeStringPrintf(&DosDeviceName, L"%ws-%04X", HYPERDBG_KERNEL_DOS_DEVICE_NAME_BASE, suffix);
+
+    //
     // Creating the device for interaction with user-mode
     //
     Ntstatus = IoCreateDevice(DriverObject,
-                              0,
+                              sizeof(HYPERKD_DEVICE_EXTENSION),
                               &DriverName,
                               FILE_DEVICE_UNKNOWN,
                               FILE_DEVICE_SECURE_OPEN,
@@ -69,12 +91,52 @@ DriverEntry(
 
         DriverObject->DriverUnload = DrvUnload;
         IoCreateSymbolicLink(&DosDeviceName, &DriverName);
+
+        //
+        // Persist the composed name in the device extension for cleanup
+        //
+        PHYPERKD_DEVICE_EXTENSION Ext = (PHYPERKD_DEVICE_EXTENSION)DeviceObject->DeviceExtension;
+        RtlInitEmptyUnicodeString(&Ext->DosDeviceName, Ext->DosDeviceNameBuffer, sizeof(Ext->DosDeviceNameBuffer));
+        RtlCopyUnicodeString(&Ext->DosDeviceName, &DosDeviceName);
+
+        //
+        // Persist the random suffix for user-mode in the registry under ...\Services\<name>\Parameters
+        //
+        if (RegistryPath && RegistryPath->Buffer)
+        {
+            HANDLE           ParametersKeyHandle = NULL;
+            OBJECT_ATTRIBUTES Attributes;
+            WCHAR             ParametersPathBuffer[512] = {0};
+            UNICODE_STRING    ParametersPath;
+            UNICODE_STRING    ValueName;
+            ULONG             Disposition = 0;
+
+            RtlInitEmptyUnicodeString(&ParametersPath, ParametersPathBuffer, sizeof(ParametersPathBuffer));
+            RtlUnicodeStringPrintf(&ParametersPath, L"%wZ\\Parameters", RegistryPath);
+
+            InitializeObjectAttributes(&Attributes, &ParametersPath, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
+
+            if (NT_SUCCESS(ZwCreateKey(&ParametersKeyHandle, KEY_ALL_ACCESS, &Attributes, 0, NULL, REG_OPTION_NON_VOLATILE, &Disposition)))
+            {
+                RtlInitUnicodeString(&ValueName, L"DeviceSuffix");
+                ZwSetValueKey(ParametersKeyHandle, &ValueName, 0, REG_DWORD, &suffix, sizeof(suffix));
+
+                // Optionally persist the DOS name for diagnostics
+                RtlInitUnicodeString(&ValueName, L"DosDeviceName");
+                ZwSetValueKey(ParametersKeyHandle, &ValueName, 0, REG_SZ, DosDeviceName.Buffer, DosDeviceName.Length + sizeof(WCHAR));
+
+                ZwClose(ParametersKeyHandle);
+            }
+        }
     }
 
     //
     // Establish user-buffer access method.
     //
-    DeviceObject->Flags |= DO_BUFFERED_IO;
+    if (DeviceObject)
+    {
+        DeviceObject->Flags |= DO_BUFFERED_IO;
+    }
 
     //
     // We cannot use logging mechanism of HyperDbg as it's not initialized yet
@@ -94,11 +156,17 @@ DriverEntry(
 VOID
 DrvUnload(PDRIVER_OBJECT DriverObject)
 {
-    UNICODE_STRING DosDeviceName;
+    PHYPERKD_DEVICE_EXTENSION Ext = NULL;
 
-    RtlInitUnicodeString(&DosDeviceName, HYPERDBG_KERNEL_DOS_DEVICE_NAME);
-    IoDeleteSymbolicLink(&DosDeviceName);
-    IoDeleteDevice(DriverObject->DeviceObject);
+    if (DriverObject && DriverObject->DeviceObject)
+    {
+        Ext = (PHYPERKD_DEVICE_EXTENSION)DriverObject->DeviceObject->DeviceExtension;
+        if (Ext && Ext->DosDeviceName.Buffer)
+        {
+            IoDeleteSymbolicLink(&Ext->DosDeviceName);
+        }
+        IoDeleteDevice(DriverObject->DeviceObject);
+    }
 
     //
     // Unloading VMM and Debugger

@@ -49,14 +49,16 @@
 //            Driver Device Interface            //
 //////////////////////////////////////////////////
 
-// Kernel-mode internal device name
-#define HYPERDBG_KERNEL_DEVICE_NAME L"\\Device\\RtlCoreIo"
+// Base names used to compose runtime device names (a random suffix is appended)
+#define HYPERDBG_KERNEL_DEVICE_NAME_BASE      L"\\Device\\RtlCoreIo"
+#define HYPERDBG_KERNEL_DOS_DEVICE_NAME_BASE  L"\\DosDevices\\RtlCoreIo"
+#define HYPERDBG_USER_DEVICE_NAME_BASE        "\\\\.\\RtlCoreIo"
+#define HYPERDBG_USER_DEVICE_NAME_BASE_W      L"\\\\.\\RtlCoreIo"
 
-// Kernel-mode DOS symbolic link name
-#define HYPERDBG_KERNEL_DOS_DEVICE_NAME L"\\DosDevices\\RtlCoreIo"
-
-// User-mode device path used with CreateFileA/CreateFileW
-#define HYPERDBG_USER_DEVICE_NAME "\\\\.\\RtlCoreIo"
+// Backward-compatible defaults (used if runtime resolution fails)
+#define HYPERDBG_KERNEL_DEVICE_NAME           HYPERDBG_KERNEL_DEVICE_NAME_BASE
+#define HYPERDBG_KERNEL_DOS_DEVICE_NAME       HYPERDBG_KERNEL_DOS_DEVICE_NAME_BASE
+#define HYPERDBG_USER_DEVICE_NAME             HYPERDBG_USER_DEVICE_NAME_BASE
 
 //////////////////////////////////////////////////
 //                   Test Cases                   //

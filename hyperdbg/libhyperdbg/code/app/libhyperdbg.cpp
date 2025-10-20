@@ -169,6 +169,29 @@ ShowMessages(const char * Fmt, ...)
  * @param Device Driver handle
  * @return VOID
  */
+static void ResolveHyperDbgDevicePathA(char* outBuffer, size_t outBufferSize)
+{
+    // Default fallback
+    strcpy_s(outBuffer, outBufferSize, HYPERDBG_USER_DEVICE_NAME);
+
+    HKEY  hKey = NULL;
+    char  regPath[256] = {0};
+    DWORD suffix       = 0;
+    DWORD type         = 0;
+    DWORD cbData       = sizeof(suffix);
+
+    sprintf_s(regPath, sizeof(regPath), "SYSTEM\\CurrentControlSet\\Services\\%s\\Parameters", KERNEL_DEBUGGER_DRIVER_NAME);
+
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, regPath, 0, KEY_READ | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
+    {
+        if (RegQueryValueExA(hKey, "DeviceSuffix", NULL, &type, (LPBYTE)&suffix, &cbData) == ERROR_SUCCESS && type == REG_DWORD)
+        {
+            sprintf_s(outBuffer, outBufferSize, "%s-%04X", HYPERDBG_USER_DEVICE_NAME_BASE, suffix);
+        }
+        RegCloseKey(hKey);
+    }
+}
+
 VOID
 ReadIrpBasedBuffer()
 {
@@ -190,8 +213,11 @@ ReadIrpBasedBuffer()
     // even if it's odd but that what happens, so this way we can solve it
     // if you know why this problem happens, then contact me !
     //
+    char devicePath[128] = {0};
+    ResolveHyperDbgDevicePathA(devicePath, sizeof(devicePath));
+
     Handle = CreateFileA(
-        HYPERDBG_USER_DEVICE_NAME,
+        devicePath,
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
         NULL, /// lpSecurityAttirbutes
@@ -695,8 +721,11 @@ HyperDbgCreateHandleFromVmmModule()
     //
     // Init entering vmx
     //
+    char devicePath[128] = {0};
+    ResolveHyperDbgDevicePathA(devicePath, sizeof(devicePath));
+
     g_DeviceHandle = CreateFileA(
-        HYPERDBG_USER_DEVICE_NAME,
+        devicePath,
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
         NULL, /// lpSecurityAttirbutes
