@@ -28,8 +28,8 @@ DriverEntry(
     NTSTATUS       Ntstatus      = STATUS_SUCCESS;
     UINT64         Index         = 0;
     PDEVICE_OBJECT DeviceObject  = NULL;
-    UNICODE_STRING DriverName    = RTL_CONSTANT_STRING(L"\\Device\\HyperDbgDebuggerDevice");
-    UNICODE_STRING DosDeviceName = RTL_CONSTANT_STRING(L"\\DosDevices\\HyperDbgDebuggerDevice");
+    UNICODE_STRING DriverName    = RTL_CONSTANT_STRING(HYPERDBG_KERNEL_DEVICE_NAME);
+    UNICODE_STRING DosDeviceName = RTL_CONSTANT_STRING(HYPERDBG_KERNEL_DOS_DEVICE_NAME);
 
     UNREFERENCED_PARAMETER(RegistryPath);
     UNREFERENCED_PARAMETER(DriverObject);
@@ -79,7 +79,7 @@ DriverEntry(
     //
     // We cannot use logging mechanism of HyperDbg as it's not initialized yet
     //
-    DbgPrint("HyperDbg's device and major functions are loaded");
+    DbgPrint("Device and major functions are initialized");
 
     ASSERT(NT_SUCCESS(Ntstatus));
     return Ntstatus;
@@ -96,7 +96,7 @@ DrvUnload(PDRIVER_OBJECT DriverObject)
 {
     UNICODE_STRING DosDeviceName;
 
-    RtlInitUnicodeString(&DosDeviceName, L"\\DosDevices\\HyperDbgDebuggerDevice");
+    RtlInitUnicodeString(&DosDeviceName, HYPERDBG_KERNEL_DOS_DEVICE_NAME);
     IoDeleteSymbolicLink(&DosDeviceName);
     IoDeleteDevice(DriverObject->DeviceObject);
 

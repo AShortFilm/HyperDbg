@@ -34,10 +34,10 @@
 #define VMM_DRIVER_NAME "hyperhv"
 
 /**
- * @brief name of HyperDbg's debugger driver
+ * @brief name of HyperDbg's debugger driver (service name)
  *
  */
-#define KERNEL_DEBUGGER_DRIVER_NAME "hyperkd"
+#define KERNEL_DEBUGGER_DRIVER_NAME "kdcore"
 
 /**
  * @brief name of HyperDbg's debugger driver + extension
@@ -46,7 +46,20 @@
 #define KERNEL_DEBUGGER_DRIVER_NAME_AND_EXTENSION "hyperkd.sys"
 
 //////////////////////////////////////////////////
-//				   Test Cases                   //
+//            Driver Device Interface            //
+//////////////////////////////////////////////////
+
+// Kernel-mode internal device name
+#define HYPERDBG_KERNEL_DEVICE_NAME L"\\Device\\RtlCoreIo"
+
+// Kernel-mode DOS symbolic link name
+#define HYPERDBG_KERNEL_DOS_DEVICE_NAME L"\\DosDevices\\RtlCoreIo"
+
+// User-mode device path used with CreateFileA/CreateFileW
+#define HYPERDBG_USER_DEVICE_NAME "\\\\.\\RtlCoreIo"
+
+//////////////////////////////////////////////////
+//                   Test Cases                   //
 //////////////////////////////////////////////////
 
 /**
@@ -110,7 +123,7 @@
 #define HWDBG_SCRIPT_TEST_CASE_SAMPLE_TESTS_DIRECTORY "..\\..\\..\\tests\\hwdbg-tests\\scripts\\sample-tests"
 
 //////////////////////////////////////////////////
-//				Delay Speeds                    //
+//                Delay Speeds                    //
 //////////////////////////////////////////////////
 
 /**

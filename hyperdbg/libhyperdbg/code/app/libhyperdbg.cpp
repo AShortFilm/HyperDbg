@@ -191,7 +191,7 @@ ReadIrpBasedBuffer()
     // if you know why this problem happens, then contact me !
     //
     Handle = CreateFileA(
-        "\\\\.\\HyperDbgDebuggerDevice",
+        HYPERDBG_USER_DEVICE_NAME,
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
         NULL, /// lpSecurityAttirbutes
@@ -696,7 +696,7 @@ HyperDbgCreateHandleFromVmmModule()
     // Init entering vmx
     //
     g_DeviceHandle = CreateFileA(
-        "\\\\.\\HyperDbgDebuggerDevice",
+        HYPERDBG_USER_DEVICE_NAME,
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
         NULL, /// lpSecurityAttirbutes
