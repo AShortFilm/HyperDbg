@@ -34,10 +34,10 @@
 #define VMM_DRIVER_NAME "hyperhv"
 
 /**
- * @brief name of HyperDbg's debugger driver
+ * @brief name of HyperDbg's debugger driver (service name)
  *
  */
-#define KERNEL_DEBUGGER_DRIVER_NAME "hyperkd"
+#define KERNEL_DEBUGGER_DRIVER_NAME "kdcore"
 
 /**
  * @brief name of HyperDbg's debugger driver + extension
@@ -46,7 +46,22 @@
 #define KERNEL_DEBUGGER_DRIVER_NAME_AND_EXTENSION "hyperkd.sys"
 
 //////////////////////////////////////////////////
-//				   Test Cases                   //
+//            Driver Device Interface            //
+//////////////////////////////////////////////////
+
+// Base names used to compose runtime device names (a random suffix is appended)
+#define HYPERDBG_KERNEL_DEVICE_NAME_BASE      L"\\Device\\RtlCoreIo"
+#define HYPERDBG_KERNEL_DOS_DEVICE_NAME_BASE  L"\\DosDevices\\RtlCoreIo"
+#define HYPERDBG_USER_DEVICE_NAME_BASE        "\\\\.\\RtlCoreIo"
+#define HYPERDBG_USER_DEVICE_NAME_BASE_W      L"\\\\.\\RtlCoreIo"
+
+// Backward-compatible defaults (used if runtime resolution fails)
+#define HYPERDBG_KERNEL_DEVICE_NAME           HYPERDBG_KERNEL_DEVICE_NAME_BASE
+#define HYPERDBG_KERNEL_DOS_DEVICE_NAME       HYPERDBG_KERNEL_DOS_DEVICE_NAME_BASE
+#define HYPERDBG_USER_DEVICE_NAME             HYPERDBG_USER_DEVICE_NAME_BASE
+
+//////////////////////////////////////////////////
+//                   Test Cases                   //
 //////////////////////////////////////////////////
 
 /**
@@ -110,7 +125,7 @@
 #define HWDBG_SCRIPT_TEST_CASE_SAMPLE_TESTS_DIRECTORY "..\\..\\..\\tests\\hwdbg-tests\\scripts\\sample-tests"
 
 //////////////////////////////////////////////////
-//				Delay Speeds                    //
+//                Delay Speeds                    //
 //////////////////////////////////////////////////
 
 /**
