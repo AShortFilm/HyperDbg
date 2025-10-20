@@ -54,6 +54,7 @@ set(SourceFiles
     "code/debugger/commands/meta-commands/start.cpp"
     "code/debugger/commands/meta-commands/switch.cpp"
     "code/debugger/commands/meta-commands/thread.cpp"
+    "code/debugger/commands/meta-commands/drvinfo.cpp"
     "code/debugger/core/break-control.cpp"
     "code/debugger/core/debugger.cpp"
     "code/debugger/core/interpreter.cpp"

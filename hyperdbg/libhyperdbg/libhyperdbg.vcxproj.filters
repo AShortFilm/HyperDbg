@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="header">
@@ -386,6 +386,9 @@
       <Filter>code\debugger\commands\meta-commands</Filter>
     </ClCompile>
     <ClCompile Include="code\debugger\commands\meta-commands\status.cpp">
+      <Filter>code\debugger\commands\meta-commands</Filter>
+    </ClCompile>
+    <ClCompile Include="code\debugger\commands\meta-commands\drvinfo.cpp">
       <Filter>code\debugger\commands\meta-commands</Filter>
     </ClCompile>
     <ClCompile Include="code\debugger\commands\meta-commands\sym.cpp">

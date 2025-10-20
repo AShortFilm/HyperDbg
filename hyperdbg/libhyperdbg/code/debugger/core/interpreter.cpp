@@ -1408,8 +1408,10 @@ InitializeCommandsDictionary()
     g_CommandsList[".debug"] = {&CommandDebug, &CommandDebugHelp, DEBUGGER_COMMAND_DEBUG_ATTRIBUTES};
     g_CommandsList["debug"]  = {&CommandDebug, &CommandDebugHelp, DEBUGGER_COMMAND_DEBUG_ATTRIBUTES};
 
-    g_CommandsList[".status"] = {&CommandStatus, &CommandStatusHelp, DEBUGGER_COMMAND_DOT_STATUS_ATTRIBUTES};
-    g_CommandsList["status"]  = {&CommandStatus, &CommandStatusHelp, DEBUGGER_COMMAND_STATUS_ATTRIBUTES};
+    g_CommandsList[".status"]  = {&CommandStatus, &CommandStatusHelp, DEBUGGER_COMMAND_DOT_STATUS_ATTRIBUTES};
+    g_CommandsList["status"]   = {&CommandStatus, &CommandStatusHelp, DEBUGGER_COMMAND_STATUS_ATTRIBUTES};
+    g_CommandsList[".drvinfo"] = {&CommandDrvinfo, &CommandDrvinfoHelp, DEBUGGER_COMMAND_DRVINFO_ATTRIBUTES};
+    g_CommandsList["drvinfo"]  = {&CommandDrvinfo, &CommandDrvinfoHelp, DEBUGGER_COMMAND_DRVINFO_ATTRIBUTES};
 
     g_CommandsList["load"]  = {&CommandLoad, &CommandLoadHelp, DEBUGGER_COMMAND_LOAD_ATTRIBUTES};
     g_CommandsList[".load"] = {&CommandLoad, &CommandLoadHelp, DEBUGGER_COMMAND_LOAD_ATTRIBUTES};

@@ -12,7 +12,7 @@
 #pragma once
 
 //////////////////////////////////////////////////
-//					Help commands               //
+//                    Help commands               //
 //////////////////////////////////////////////////
 
 VOID
@@ -308,6 +308,10 @@ CommandIdtHelp();
 
 VOID
 CommandSmiHelp();
+
+// Show driver/device randomization info
+VOID
+CommandDrvinfoHelp();
 
 //
 // hwdbg commands
