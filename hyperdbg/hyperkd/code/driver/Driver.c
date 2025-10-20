@@ -44,14 +44,9 @@ DriverEntry(
     ExInitializeDriverRuntime(DrvRtPoolNxOptIn);
 
     //
-    // Compose randomized device names to reduce static detectability
+    // Compose randomized device names to reduce static detectability with retry to avoid rare collisions
     //
-    ULONG seed   = (ULONG)(__rdtsc() ^ (ULONG)(ULONG_PTR)DriverObject);
-    ULONG suffix = RtlRandomEx(&seed) & 0xFFFF;
-    if (suffix == 0)
-    {
-        suffix = 0xA001;
-    }
+    ULONG seed = (ULONG)(__rdtsc() ^ (ULONG)(ULONG_PTR)DriverObject);
 
     WCHAR DeviceNameBuffer[64]    = {0};
     WCHAR DosDeviceNameBuffer[64] = {0};
@@ -59,52 +54,54 @@ DriverEntry(
     RtlInitEmptyUnicodeString(&DriverName, DeviceNameBuffer, sizeof(DeviceNameBuffer));
     RtlInitEmptyUnicodeString(&DosDeviceName, DosDeviceNameBuffer, sizeof(DosDeviceNameBuffer));
 
-    RtlUnicodeStringPrintf(&DriverName, L"%ws-%04X", HYPERDBG_KERNEL_DEVICE_NAME_BASE, suffix);
-    RtlUnicodeStringPrintf(&DosDeviceName, L"%ws-%04X", HYPERDBG_KERNEL_DOS_DEVICE_NAME_BASE, suffix);
-
-    //
-    // Creating the device for interaction with user-mode
-    //
-    Ntstatus = IoCreateDevice(DriverObject,
-                              sizeof(HYPERKD_DEVICE_EXTENSION),
-                              &DriverName,
-                              FILE_DEVICE_UNKNOWN,
-                              FILE_DEVICE_SECURE_OPEN,
-                              FALSE,
-                              &DeviceObject);
-
-    if (Ntstatus == STATUS_SUCCESS)
+    // Try several times to avoid name collisions if a stale instance exists
+    for (int attempt = 0; attempt < 64; ++attempt)
     {
-        for (Index = 0; Index < IRP_MJ_MAXIMUM_FUNCTION; Index++)
-            DriverObject->MajorFunction[Index] = DrvUnsupported;
+        ULONG suffix = RtlRandomEx(&seed) & 0xFFFF;
+        if (suffix == 0)
+        {
+            suffix = 0xA001;
+        }
+
+        RtlUnicodeStringPrintf(&DriverName, L"%ws-%04X", HYPERDBG_KERNEL_DEVICE_NAME_BASE, suffix);
+        RtlUnicodeStringPrintf(&DosDeviceName, L"%ws-%04X", HYPERDBG_KERNEL_DOS_DEVICE_NAME_BASE, suffix);
 
         //
-        // We cannot use logging mechanism of HyperDbg as it's not initialized yet
+        // Creating the device for interaction with user-mode
         //
-        DbgPrint("Setting device major functions");
+        Ntstatus = IoCreateDevice(DriverObject,
+                                  sizeof(HYPERKD_DEVICE_EXTENSION),
+                                  &DriverName,
+                                  FILE_DEVICE_UNKNOWN,
+                                  FILE_DEVICE_SECURE_OPEN,
+                                  FALSE,
+                                  &DeviceObject);
 
-        DriverObject->MajorFunction[IRP_MJ_CLOSE]          = DrvClose;
-        DriverObject->MajorFunction[IRP_MJ_CREATE]         = DrvCreate;
-        DriverObject->MajorFunction[IRP_MJ_READ]           = DrvRead;
-        DriverObject->MajorFunction[IRP_MJ_WRITE]          = DrvWrite;
-        DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DrvDispatchIoControl;
+        if (!NT_SUCCESS(Ntstatus))
+        {
+            // Try another suffix on collision or other transient errors
+            continue;
+        }
 
-        DriverObject->DriverUnload = DrvUnload;
-        IoCreateSymbolicLink(&DosDeviceName, &DriverName);
+        // Create a DOS symbolic link, retry on failure by deleting the created device
+        NTSTATUS linkStatus = IoCreateSymbolicLink(&DosDeviceName, &DriverName);
+        if (!NT_SUCCESS(linkStatus))
+        {
+            IoDeleteDevice(DeviceObject);
+            DeviceObject = NULL;
+            Ntstatus     = linkStatus;
+            continue;
+        }
 
-        //
         // Persist the composed name in the device extension for cleanup
-        //
         PHYPERKD_DEVICE_EXTENSION Ext = (PHYPERKD_DEVICE_EXTENSION)DeviceObject->DeviceExtension;
         RtlInitEmptyUnicodeString(&Ext->DosDeviceName, Ext->DosDeviceNameBuffer, sizeof(Ext->DosDeviceNameBuffer));
         RtlCopyUnicodeString(&Ext->DosDeviceName, &DosDeviceName);
 
-        //
         // Persist the random suffix for user-mode in the registry under ...\Services\<name>\Parameters
-        //
         if (RegistryPath && RegistryPath->Buffer)
         {
-            HANDLE           ParametersKeyHandle = NULL;
+            HANDLE            ParametersKeyHandle = NULL;
             OBJECT_ATTRIBUTES Attributes;
             WCHAR             ParametersPathBuffer[512] = {0};
             UNICODE_STRING    ParametersPath;
@@ -128,20 +125,33 @@ DriverEntry(
                 ZwClose(ParametersKeyHandle);
             }
         }
+
+        // Assign dispatch routines now that device and link are ready
+        for (Index = 0; Index < IRP_MJ_MAXIMUM_FUNCTION; Index++)
+            DriverObject->MajorFunction[Index] = DrvUnsupported;
+
+        // We cannot use logging mechanism of HyperDbg as it's not initialized yet
+        DbgPrint("Setting device major functions");
+
+        DriverObject->MajorFunction[IRP_MJ_CLOSE]          = DrvClose;
+        DriverObject->MajorFunction[IRP_MJ_CREATE]         = DrvCreate;
+        DriverObject->MajorFunction[IRP_MJ_READ]           = DrvRead;
+        DriverObject->MajorFunction[IRP_MJ_WRITE]          = DrvWrite;
+        DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DrvDispatchIoControl;
+
+        DriverObject->DriverUnload = DrvUnload;
+
+        // Successful setup
+        break;
     }
 
-    //
-    // Establish user-buffer access method.
-    //
+    // Establish user-buffer access method and finalize
     if (DeviceObject)
     {
         DeviceObject->Flags |= DO_BUFFERED_IO;
+        // We cannot use logging mechanism of HyperDbg as it's not initialized yet
+        DbgPrint("Device and major functions are initialized");
     }
-
-    //
-    // We cannot use logging mechanism of HyperDbg as it's not initialized yet
-    //
-    DbgPrint("Device and major functions are initialized");
 
     ASSERT(NT_SUCCESS(Ntstatus));
     return Ntstatus;

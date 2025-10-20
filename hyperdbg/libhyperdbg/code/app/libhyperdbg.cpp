@@ -244,6 +244,42 @@ static void ResolveHyperDbgDevicePathA(char* outBuffer, size_t outBufferSize)
     // If all else fails, outBuffer remains the static base (backward compatibility)
 }
 
+static HANDLE OpenHyperDbgDeviceHandleA()
+{
+    for (int i = 0; i < 20; ++i)
+    {
+        char devicePath[128] = {0};
+        ResolveHyperDbgDevicePathA(devicePath, sizeof(devicePath));
+
+        HANDLE h = CreateFileA(
+            devicePath,
+            GENERIC_READ | GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            NULL, /// lpSecurityAttirbutes
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+            NULL); /// lpTemplateFile
+
+        if (h != INVALID_HANDLE_VALUE)
+        {
+            return h;
+        }
+
+        DWORD err = GetLastError();
+        if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND || err == ERROR_GEN_FAILURE)
+        {
+            // Device might not be fully registered yet; retry shortly
+            Sleep(50);
+            continue;
+        }
+
+        // For other errors, don't spin
+        break;
+    }
+
+    return INVALID_HANDLE_VALUE;
+}
+
 VOID
 ReadIrpBasedBuffer()
 {
@@ -265,17 +301,7 @@ ReadIrpBasedBuffer()
     // even if it's odd but that what happens, so this way we can solve it
     // if you know why this problem happens, then contact me !
     //
-    char devicePath[128] = {0};
-    ResolveHyperDbgDevicePathA(devicePath, sizeof(devicePath));
-
-    Handle = CreateFileA(
-        devicePath,
-        GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        NULL, /// lpSecurityAttirbutes
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
-        NULL); /// lpTemplateFile
+    Handle = OpenHyperDbgDeviceHandleA();
 
     if (Handle == INVALID_HANDLE_VALUE)
     {
@@ -283,13 +309,15 @@ ReadIrpBasedBuffer()
 
         if (ErrorNum == ERROR_ACCESS_DENIED)
         {
-            ShowMessages("err, access denied\nare you sure you have administrator "
-                         "rights?\n");
+            ShowMessages("err, access denied\nare you sure you have administrator rights?\n");
         }
         else if (ErrorNum == ERROR_GEN_FAILURE)
         {
-            ShowMessages("err, a device attached to the system is not functioning\n"
-                         "vmx feature might be disabled from BIOS or VBS/HVCI is active\n");
+            ShowMessages("err, a device attached to the system is not functioning\nvmx feature might be disabled from BIOS or VBS/HVCI is active\n");
+        }
+        else if (ErrorNum == ERROR_FILE_NOT_FOUND || ErrorNum == ERROR_PATH_NOT_FOUND)
+        {
+            ShowMessages("err, device path not found after retries\n");
         }
         else
         {
@@ -297,8 +325,6 @@ ReadIrpBasedBuffer()
         }
 
         g_DeviceHandle = NULL;
-        Handle         = NULL;
-
         return;
     }
 
@@ -773,30 +799,22 @@ HyperDbgCreateHandleFromVmmModule()
     //
     // Init entering vmx
     //
-    char devicePath[128] = {0};
-    ResolveHyperDbgDevicePathA(devicePath, sizeof(devicePath));
-
-    g_DeviceHandle = CreateFileA(
-        devicePath,
-        GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        NULL, /// lpSecurityAttirbutes
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
-        NULL); /// lpTemplateFile
+    g_DeviceHandle = OpenHyperDbgDeviceHandleA();
 
     if (g_DeviceHandle == INVALID_HANDLE_VALUE)
     {
         ErrorNum = GetLastError();
         if (ErrorNum == ERROR_ACCESS_DENIED)
         {
-            ShowMessages("err, access denied\nare you sure you have administrator "
-                         "rights?\n");
+            ShowMessages("err, access denied\nare you sure you have administrator rights?\n");
         }
         else if (ErrorNum == ERROR_GEN_FAILURE)
         {
-            ShowMessages("err, a device attached to the system is not functioning\n"
-                         "vmx feature might be disabled from BIOS or VBS/HVCI is active\n");
+            ShowMessages("err, a device attached to the system is not functioning\nvmx feature might be disabled from BIOS or VBS/HVCI is active\n");
+        }
+        else if (ErrorNum == ERROR_FILE_NOT_FOUND || ErrorNum == ERROR_PATH_NOT_FOUND)
+        {
+            ShowMessages("err, device path not found after retries\n");
         }
         else
         {
