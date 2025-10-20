@@ -477,12 +477,20 @@ typedef std::map<std::string, COMMAND_DETAIL> CommandType;
 #define DEBUGGER_COMMAND_SMI_ATTRIBUTES \
     DEBUGGER_COMMAND_ATTRIBUTE_LOCAL_COMMAND_IN_DEBUGGER_MODE
 
+// Show driver/device randomization info
+#define DEBUGGER_COMMAND_DRVINFO_ATTRIBUTES \
+    DEBUGGER_COMMAND_ATTRIBUTE_ABSOLUTE_LOCAL
+
 //////////////////////////////////////////////////
 //             Command Functions                //
 //////////////////////////////////////////////////
 
 VOID
 CommandTest(vector<CommandToken> CommandTokens, string Command);
+
+// .drvinfo
+VOID
+CommandDrvinfo(std::vector<CommandToken> CommandTokens, std::string Command);
 
 VOID
 CommandCls(vector<CommandToken> CommandTokens, string Command);
