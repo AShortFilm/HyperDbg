@@ -828,3 +828,63 @@ hyperdbg_u_eval_expression(CHAR * Expr, PBOOLEAN HasError)
 {
     return ScriptEngineEvalSingleExpression(Expr, HasError);
 }
+
+/**
+ * @brief Get total number of available commands
+ *
+ * @return UINT32 number of commands registered in the interpreter
+ */
+UINT32
+hyperdbg_u_get_commands_count()
+{
+    // Ensure command dictionary is initialized
+    if (g_CommandsList.empty())
+    {
+        InitializeDebugger();
+    }
+
+    return (UINT32)g_CommandsList.size();
+}
+
+/**
+ * @brief Get command name by zero-based index (alphabetical order)
+ *
+ * @param index zero-based index
+ * @param buffer destination buffer to store the command name (null-terminated)
+ * @param buffer_size size of destination buffer in bytes
+ * @return BOOLEAN TRUE on success, FALSE on invalid index or insufficient buffer size
+ */
+BOOLEAN
+hyperdbg_u_get_command_name_by_index(UINT32 index, CHAR * buffer, UINT32 buffer_size)
+{
+    if (buffer == NULL || buffer_size == 0)
+    {
+        return FALSE;
+    }
+
+    // Ensure command dictionary is initialized
+    if (g_CommandsList.empty())
+    {
+        InitializeDebugger();
+    }
+
+    if (index >= g_CommandsList.size())
+    {
+        return FALSE;
+    }
+
+    // std::map is ordered by key; iterate to the given index
+    auto it = g_CommandsList.begin();
+    std::advance(it, index);
+
+    const std::string & name = it->first;
+    size_t              len  = name.size();
+
+    if (len + 1 > buffer_size)
+    {
+        return FALSE;
+    }
+
+    strcpy_s(buffer, buffer_size, name.c_str());
+    return TRUE;
+}
