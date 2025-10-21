@@ -396,6 +396,17 @@ VmxInitialize()
     //
     if (AsmVmxVmcall(VMCALL_TEST, 0x22, 0x333, 0x4444) == STATUS_SUCCESS)
     {
+        //
+        // Enable transparent mode globally by default
+        //
+        DEBUGGER_HIDE_AND_TRANSPARENT_DEBUGGER_MODE TransparentRequest = {0};
+        TransparentRequest.IsHide                                      = TRUE;
+        // Leave process targeting empty; transparency applies system-wide in current implementation
+        TransparentRequest.TrueIfProcessIdAndFalseIfProcessName = TRUE;
+        TransparentRequest.ProcId                              = 0;
+        // SystemCallNumbersInformation left zero-initialized; user-mode can update later via IOCTL if needed
+        (void)TransparentHideDebuggerWrapper(&TransparentRequest);
+
         return TRUE;
     }
     else
@@ -421,7 +432,7 @@ VmxPerformVirtualizationOnAllCores()
     }
 
     //
-    // Allocate	global variable to hold Ept State
+    // Allocate    global variable to hold Ept State
     //
     g_EptState = PlatformMemAllocateZeroedNonPagedPool(sizeof(EPT_STATE));
 
@@ -1130,13 +1141,13 @@ VmxVmxoff(VIRTUAL_MACHINE_STATE * VCpu)
 
     //
     // According to SimpleVisor :
-    //  	Our callback routine may have interrupted an arbitrary user process,
-    //  	and therefore not a thread running with a system-wide page directory.
-    //  	Therefore if we return back to the original caller after turning off
-    //  	VMX, it will keep our current "host" CR3 value which we set on entry
-    //  	to the PML4 of the SYSTEM process. We want to return back with the
-    //  	correct value of the "guest" CR3, so that the currently executing
-    //  	process continues to run with its expected address space mappings.
+    //      Our callback routine may have interrupted an arbitrary user process,
+    //      and therefore not a thread running with a system-wide page directory.
+    //      Therefore if we return back to the original caller after turning off
+    //      VMX, it will keep our current "host" CR3 value which we set on entry
+    //      to the PML4 of the SYSTEM process. We want to return back with the
+    //      correct value of the "guest" CR3, so that the currently executing
+    //      process continues to run with its expected address space mappings.
     //
 
     __vmx_vmread(VMCS_GUEST_CR3, &GuestCr3);
