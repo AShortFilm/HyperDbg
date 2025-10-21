@@ -18,11 +18,6 @@ extern TCHAR   g_DriverLocation[MAX_PATH];
 extern TCHAR   g_DriverName[MAX_PATH];
 extern BOOLEAN g_UseCustomDriverLocation;
 
-//
-// Commands dictionary (defined once in pch.cpp via globals.h)
-//
-extern CommandType g_CommandsList;
-
 /**
  * @brief Detects the support of VMX
  *
