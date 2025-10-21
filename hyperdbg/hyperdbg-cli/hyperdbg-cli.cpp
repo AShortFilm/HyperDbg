@@ -30,6 +30,8 @@
 
 using namespace std;
 
+static string to_lower_copy(const string & s);
+
 static string g_captured_output;
 
 static int hyperdbg_capture_messages(const char * Text)
@@ -39,6 +41,253 @@ static int hyperdbg_capture_messages(const char * Text)
        g_captured_output.append(Text);
    }
    return 0;
+}
+
+// Cached command list for interactive auto-complete
+static bool              g_commands_loaded = false;
+static vector<string>    g_all_commands;
+
+static void ensure_command_list_loaded()
+{
+    if (g_commands_loaded)
+    {
+        return;
+    }
+
+    UINT32 count = hyperdbg_u_get_commands_count();
+    if (count == 0)
+    {
+        // Try to force initialization by running a no-op command
+        // Not strictly necessary; library side ensures initialization
+    }
+
+    g_all_commands.clear();
+    g_all_commands.reserve(count);
+
+    for (UINT32 i = 0; i < count; ++i)
+    {
+        char buf[128] = {0};
+        if (hyperdbg_u_get_command_name_by_index(i, buf, (UINT32)sizeof(buf)))
+        {
+            g_all_commands.emplace_back(buf);
+        }
+    }
+
+    g_commands_loaded = true;
+}
+
+static vector<string> get_prefix_matches(const string & prefix)
+{
+    vector<string> matches;
+    if (!g_commands_loaded)
+    {
+        ensure_command_list_loaded();
+    }
+
+    string pfx = to_lower_copy(prefix);
+    for (const auto & cmd : g_all_commands)
+    {
+        string low = to_lower_copy(cmd);
+        if (low.rfind(pfx, 0) == 0) // starts_with
+        {
+            matches.push_back(cmd);
+        }
+    }
+    return matches;
+}
+
+static string longest_common_prefix(const vector<string> & items)
+{
+    if (items.empty())
+    {
+        return string();
+    }
+    string lcp = items[0];
+    for (size_t i = 1; i < items.size(); ++i)
+    {
+        const string & s = items[i];
+        size_t         j = 0;
+        while (j < lcp.size() && j < s.size() && tolower((unsigned char)lcp[j]) == tolower((unsigned char)s[j]))
+        {
+            ++j;
+        }
+        lcp.resize(j);
+        if (lcp.empty())
+        {
+            break;
+        }
+    }
+    return lcp;
+}
+
+static void print_first_n_lines(const string & text, int n)
+{
+    istringstream iss(text);
+    string        line;
+    int           count = 0;
+    while (count < n && std::getline(iss, line))
+    {
+        printf("%s\n", line.c_str());
+        ++count;
+    }
+    if (iss.peek() != EOF)
+    {
+        printf("...\n");
+    }
+}
+
+static void show_help_preview_for_command(const string & cmd, bool multiline_prompt)
+{
+    char help_cmd[256] = {0};
+    sprintf_s(help_cmd, sizeof(help_cmd), ".help %s", cmd.c_str());
+
+    g_captured_output.clear();
+    hyperdbg_u_set_text_message_callback((PVOID)hyperdbg_capture_messages);
+    hyperdbg_u_run_command((CHAR *)help_cmd);
+    hyperdbg_u_unset_text_message_callback();
+
+    if (!g_captured_output.empty())
+    {
+        printf("\n");
+        print_first_n_lines(g_captured_output, 6);
+        if (multiline_prompt)
+        {
+            printf("> ");
+        }
+        else
+        {
+            hyperdbg_u_show_signature();
+        }
+    }
+}
+
+static string read_line_interactive(bool multiline_prompt)
+{
+    string buf;
+
+    while (true)
+    {
+        int ch = _getch();
+
+        // Handle special prefix for function keys
+        if (ch == 0 || ch == 224)
+        {
+            int ext = _getch();
+            (void)ext; // Ignored for now
+            continue;
+        }
+
+        if (ch == '\r' || ch == '\n')
+        {
+            printf("\n");
+            return buf;
+        }
+        else if (ch == '\t')
+        {
+            // Tab for autocomplete (first token only)
+            size_t space_pos = buf.find(' ');
+            if (space_pos != string::npos)
+            {
+                // Don't autocomplete beyond the first token
+                printf("\a");
+                continue;
+            }
+
+            string prefix = buf;
+            auto   matches = get_prefix_matches(prefix);
+
+            if (matches.empty())
+            {
+                printf("\a");
+                continue;
+            }
+            else if (matches.size() == 1)
+            {
+                const string & full = matches[0];
+                if (full.size() > prefix.size())
+                {
+                    string add = full.substr(prefix.size());
+                    printf("%s", add.c_str());
+                    buf += add;
+                }
+                // add trailing space after full command
+                printf(" ");
+                buf += ' ';
+
+                // Show brief help preview
+                show_help_preview_for_command(full, multiline_prompt);
+                // Reprint current buffer
+                printf("%s", buf.c_str());
+            }
+            else
+            {
+                string lcp = longest_common_prefix(matches);
+                if (lcp.size() > prefix.size())
+                {
+                    string add = lcp.substr(prefix.size());
+                    printf("%s", add.c_str());
+                    buf += add;
+                }
+                else
+                {
+                    // Print suggestions
+                    printf("\n");
+                    int col = 0;
+                    for (size_t i = 0; i < matches.size(); ++i)
+                    {
+                        const string & m = matches[i];
+                        printf("%-16s", m.c_str());
+                        col++;
+                        if (col >= 6)
+                        {
+                            printf("\n");
+                            col = 0;
+                        }
+                    }
+                    if (col != 0)
+                    {
+                        printf("\n");
+                    }
+                    if (multiline_prompt)
+                    {
+                        printf("> ");
+                    }
+                    else
+                    {
+                        hyperdbg_u_show_signature();
+                    }
+                    printf("%s", buf.c_str());
+                }
+            }
+        }
+        else if (ch == 8) // backspace
+        {
+            if (!buf.empty())
+            {
+                printf("\b \b");
+                buf.pop_back();
+            }
+            else
+            {
+                printf("\a");
+            }
+        }
+        else if (isprint(ch))
+        {
+            putchar(ch);
+            buf.push_back((char)ch);
+        }
+        else if (ch == 3) // Ctrl+C
+        {
+            // Cancel current line
+            printf("\n");
+            return string();
+        }
+        else
+        {
+            // Ignore others
+        }
+    }
 }
 
 static string to_lower_copy(const string & s)
@@ -436,19 +685,7 @@ main(int argc, char * argv[])
 
        string temp_command = "";
 
-       getline(cin, temp_command);
-
-       if (cin.fail() || cin.eof())
-       {
-           cin.clear(); // reset cin state
-
-           printf("\n\n");
-
-           //
-           // probably sth like CTRL+C pressed
-           //
-           continue;
-       }
+       temp_command = read_line_interactive(reset == FALSE);
 
        //
        // Check for multi-line commands

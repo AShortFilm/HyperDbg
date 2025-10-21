@@ -85,6 +85,13 @@ hyperdbg_u_set_text_message_callback_using_shared_buffer(PVOID handler);
 IMPORT_EXPORT_LIBHYPERDBG VOID
 hyperdbg_u_unset_text_message_callback();
 
+// Command discovery (for interactive CLI)
+IMPORT_EXPORT_LIBHYPERDBG UINT32
+hyperdbg_u_get_commands_count();
+
+IMPORT_EXPORT_LIBHYPERDBG BOOLEAN
+hyperdbg_u_get_command_name_by_index(UINT32 index, CHAR * buffer, UINT32 buffer_size);
+
 IMPORT_EXPORT_LIBHYPERDBG INT
 hyperdbg_u_script_read_file_and_execute_commandline(INT argc, CHAR * argv[]);
 
