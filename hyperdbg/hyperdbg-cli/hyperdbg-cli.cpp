@@ -317,6 +317,26 @@ static string strip_ext(const string & name)
    return name.substr(0, dot);
 }
 
+static string tchar_to_utf8(const TCHAR * s)
+{
+#ifdef UNICODE
+    if (!s)
+    {
+        return string();
+    }
+    int len = WideCharToMultiByte(CP_UTF8, 0, s, -1, nullptr, 0, nullptr, nullptr);
+    if (len <= 0)
+    {
+        return string();
+    }
+    string out(len - 1, '\0');
+    (void)WideCharToMultiByte(CP_UTF8, 0, s, -1, &out[0], len, nullptr, nullptr);
+    return out;
+#else
+    return s ? string(s) : string();
+#endif
+}
+
 static DWORD find_process_id_by_name(const string & name)
 {
    string target = to_lower_copy(name);
@@ -335,7 +355,11 @@ static DWORD find_process_id_by_name(const string & name)
    {
        do
        {
+#ifdef UNICODE
+           string exe = to_lower_copy(tchar_to_utf8(pe.szExeFile));
+#else
            string exe = to_lower_copy(pe.szExeFile);
+#endif
            string exe_base = to_lower_copy(strip_ext(basename_only(exe)));
            if (exe_base == target_base)
            {
