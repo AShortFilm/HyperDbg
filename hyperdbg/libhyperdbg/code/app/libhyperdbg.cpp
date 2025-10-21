@@ -184,21 +184,24 @@ static void ResolveHyperDbgDevicePathA(char* outBuffer, size_t outBufferSize)
 
     if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, regPath, 0, KEY_READ | KEY_WOW64_64KEY, &hKey) == ERROR_SUCCESS)
     {
-        // Primary: use the numeric suffix persisted by the driver
-        if (RegQueryValueExA(hKey, "DeviceSuffix", NULL, &type, (LPBYTE)&suffix, &cbData) == ERROR_SUCCESS && type == REG_DWORD)
+        // Prefer explicit user-mode path if the driver provided it
+        char userName[260] = {0};
+        DWORD cbUser       = sizeof(userName);
+        type               = 0;
+        if (RegQueryValueExA(hKey, "UserDeviceName", NULL, &type, (LPBYTE)userName, &cbUser) == ERROR_SUCCESS && type == REG_SZ && userName[0] != '\0')
         {
-            sprintf_s(outBuffer, outBufferSize, "%s-%04X", HYPERDBG_USER_DEVICE_NAME_BASE, suffix);
+            strncpy_s(outBuffer, outBufferSize, userName, _TRUNCATE);
             RegCloseKey(hKey);
             return;
         }
 
-        // Fallback 1: use the persisted DOS device name directly if present
+        // Next, use the persisted DOS device name directly if present
         char dosName[260] = {0};
         cbData            = sizeof(dosName);
         type              = 0;
         if (RegQueryValueExA(hKey, "DosDeviceName", NULL, &type, (LPBYTE)dosName, &cbData) == ERROR_SUCCESS && type == REG_SZ)
         {
-            // Typically of the form "\\\\DosDevices\\\\RtlCoreIo-XXXX"
+            // Typically of the form "\\\\DosDevices\\\\<leaf>-XXXX" or "\\\\??\\\\<leaf>-XXXX"
             const char* tail      = dosName;
             const char* lastSlash = strrchr(dosName, '\\');
             if (lastSlash && lastSlash[1] != '\0')
@@ -206,6 +209,14 @@ static void ResolveHyperDbgDevicePathA(char* outBuffer, size_t outBufferSize)
                 tail = lastSlash + 1;
             }
             sprintf_s(outBuffer, outBufferSize, "\\\\.\\%s", tail);
+            RegCloseKey(hKey);
+            return;
+        }
+
+        // Fallback: use the numeric suffix persisted by the driver with compile-time base
+        if (RegQueryValueExA(hKey, "DeviceSuffix", NULL, &type, (LPBYTE)&suffix, &cbData) == ERROR_SUCCESS && type == REG_DWORD)
+        {
+            sprintf_s(outBuffer, outBufferSize, "%s-%04X", HYPERDBG_USER_DEVICE_NAME_BASE, suffix);
             RegCloseKey(hKey);
             return;
         }

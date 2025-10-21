@@ -45,6 +45,7 @@ DriverEntry(
 
     //
     // Compose randomized device names to reduce static detectability with retry to avoid rare collisions
+    // Randomize both the leaf identifier and the DOS device namespace (\DosDevices vs. \??)
     //
     ULONG seed = (ULONG)(__rdtsc() ^ (ULONG)(ULONG_PTR)DriverObject);
 
@@ -57,14 +58,28 @@ DriverEntry(
     // Try several times to avoid name collisions if a stale instance exists
     for (int attempt = 0; attempt < 64; ++attempt)
     {
+        // Random 16-bit suffix (hex) and random alphabetic base (6-12 chars)
         ULONG suffix = RtlRandomEx(&seed) & 0xFFFF;
         if (suffix == 0)
         {
             suffix = 0xA001;
         }
 
-        RtlUnicodeStringPrintf(&DriverName, L"%ws-%04X", HYPERDBG_KERNEL_DEVICE_NAME_BASE, suffix);
-        RtlUnicodeStringPrintf(&DosDeviceName, L"%ws-%04X", HYPERDBG_KERNEL_DOS_DEVICE_NAME_BASE, suffix);
+        WCHAR baseLeaf[24] = {0};
+        UINT  baseLen      = 6 + (RtlRandomEx(&seed) % 7); // length in [6..12]
+        for (UINT i = 0; i < baseLen && i < RTL_NUMBER_OF(baseLeaf) - 1; ++i)
+        {
+            ULONG r = RtlRandomEx(&seed) % 52; // [0..51]
+            baseLeaf[i] = (WCHAR)((r < 26) ? (L'A' + r) : (L'a' + (r - 26)));
+        }
+        baseLeaf[baseLen] = L'\0';
+
+        // Randomize DOS device namespace prefix
+        const WCHAR* dosNsPrefix = (RtlRandomEx(&seed) & 1) ? L"\\??\\" : L"\\DosDevices\\";
+
+        // Compose full names
+        RtlUnicodeStringPrintf(&DriverName, L"\\Device\\%ws-%04X", baseLeaf, suffix);
+        RtlUnicodeStringPrintf(&DosDeviceName, L"%ws%ws-%04X", dosNsPrefix, baseLeaf, suffix);
 
         //
         // Creating the device for interaction with user-mode
@@ -79,7 +94,7 @@ DriverEntry(
 
         if (!NT_SUCCESS(Ntstatus))
         {
-            // Try another suffix on collision or other transient errors
+            // Try another identifier on collision or other transient errors
             continue;
         }
 
@@ -93,12 +108,12 @@ DriverEntry(
             continue;
         }
 
-        // Persist the composed name in the device extension for cleanup
+        // Persist the composed DOS name in the device extension for cleanup
         PHYPERKD_DEVICE_EXTENSION Ext = (PHYPERKD_DEVICE_EXTENSION)DeviceObject->DeviceExtension;
         RtlInitEmptyUnicodeString(&Ext->DosDeviceName, Ext->DosDeviceNameBuffer, sizeof(Ext->DosDeviceNameBuffer));
         RtlCopyUnicodeString(&Ext->DosDeviceName, &DosDeviceName);
 
-        // Persist the random suffix for user-mode in the registry under ...\Services\<name>\Parameters
+        // Persist randomization artifacts for user-mode in the registry under ...\Services\<name>\Parameters
         if (RegistryPath && RegistryPath->Buffer)
         {
             HANDLE            ParametersKeyHandle = NULL;
@@ -115,12 +130,22 @@ DriverEntry(
 
             if (NT_SUCCESS(ZwCreateKey(&ParametersKeyHandle, KEY_ALL_ACCESS, &Attributes, 0, NULL, REG_OPTION_NON_VOLATILE, &Disposition)))
             {
+                // Numeric suffix for backward compatibility
                 RtlInitUnicodeString(&ValueName, L"DeviceSuffix");
                 ZwSetValueKey(ParametersKeyHandle, &ValueName, 0, REG_DWORD, &suffix, sizeof(suffix));
 
-                // Optionally persist the DOS name for diagnostics
+                // Persist the DOS link full path, e.g., "\\??\\XyZabc-1A2B"
                 RtlInitUnicodeString(&ValueName, L"DosDeviceName");
                 ZwSetValueKey(ParametersKeyHandle, &ValueName, 0, REG_SZ, DosDeviceName.Buffer, DosDeviceName.Length + sizeof(WCHAR));
+
+                // Persist the user-mode CreateFile path, e.g., "\\\\.\\XyZabc-1A2B"
+                WCHAR UserDeviceNameBuffer[64] = {0};
+                UNICODE_STRING UserDeviceName;
+                RtlInitEmptyUnicodeString(&UserDeviceName, UserDeviceNameBuffer, sizeof(UserDeviceNameBuffer));
+                RtlUnicodeStringPrintf(&UserDeviceName, L"\\\\.\\%ws-%04X", baseLeaf, suffix);
+
+                RtlInitUnicodeString(&ValueName, L"UserDeviceName");
+                ZwSetValueKey(ParametersKeyHandle, &ValueName, 0, REG_SZ, UserDeviceName.Buffer, UserDeviceName.Length + sizeof(WCHAR));
 
                 ZwClose(ParametersKeyHandle);
             }
