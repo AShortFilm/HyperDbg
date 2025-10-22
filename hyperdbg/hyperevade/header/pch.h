@@ -25,11 +25,10 @@
 
 //
 // The DLL is flagged by antivirus software, since it contains anti-debugging and anti-hypervisor methods
-// as well as different anti-debugging strings.
-// Transparency protections now ship enabled by default; set this flag to TRUE before building if you need
-// to explicitly disable the Hyperevade module for testing purposes.
+// as well as different anti-debugging strings
+// For now, we disable the HyperDbg Hyperevade module
 //
-#    define DISABLE_HYPERDBG_HYPEREVADE FALSE
+#    define DISABLE_HYPERDBG_HYPEREVADE TRUE
 
 //
 // Windows defined functions
