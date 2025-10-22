@@ -343,10 +343,6 @@ HyperDbgEnableTransparentMode(UINT32 ProcessId, CHAR * ProcessName, BOOLEAN IsPr
         free(FinalRequestBuffer);
         return FALSE;
     }
-    else if (FinalRequestBuffer->KernelStatus == DEBUGGER_ERROR_DEBUGGER_ALREADY_HIDE)
-    {
-        ShowMessages("transparent debugging is already enabled.\n");
-    }
     else
     {
         ShowMessages("unknown error occurred :(\n");

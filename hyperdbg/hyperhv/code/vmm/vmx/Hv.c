@@ -1394,21 +1394,7 @@ HvInitVmm(VMM_CALLBACKS * VmmCallbacks)
     //
     // Initializes VMX
     //
-    Result = VmxInitialize();
-
-    if (!Result)
-    {
-        return FALSE;
-    }
-
-#if ActivateHyperEvadeProject == TRUE
-    if (!TransparentEnableDefaultMode())
-    {
-        LogWarning("Warning, unable to enable transparent mode automatically at startup.");
-    }
-#endif
-
-    return TRUE;
+    return VmxInitialize();
 }
 
 /**
