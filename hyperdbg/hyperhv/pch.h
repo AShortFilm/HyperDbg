@@ -90,9 +90,7 @@
 //
 #include "vmm/vmx/VmxBroadcast.h"
 #include "memory/MemoryMapper.h"
-#include "memory/ModuleEnumerator.h"
 #include "interface/Dispatch.h"
-#include "interface/StealthyMemory.h"
 #include "common/Dpc.h"
 #include "common/Msr.h"
 #include "memory/PoolManager.h"
