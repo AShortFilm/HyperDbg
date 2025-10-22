@@ -213,22 +213,32 @@ PoolManagerRequestPool(POOL_ALLOCATION_INTENTION Intention, BOOLEAN RequestNewPo
 {
     UINT64 Address = 0;
 
-    ScopedSpinlock(
-        LockForReadingPool,
-        LIST_FOR_EACH_LINK(g_ListOfAllocatedPoolsHead, POOL_TABLE, PoolsList, PoolTable) {
+    SpinlockLock(&LockForReadingPool);
+
+    if (g_ListOfAllocatedPoolsHead.Flink != NULL)
+    {
+        for (PLIST_ENTRY Entry = g_ListOfAllocatedPoolsHead.Flink;
+             Entry != &g_ListOfAllocatedPoolsHead;
+             Entry = Entry->Flink)
+        {
+            PPOOL_TABLE PoolTable = CONTAINING_RECORD(Entry, POOL_TABLE, PoolsList);
+
             if (PoolTable->Intention == Intention && PoolTable->IsBusy == FALSE)
             {
                 PoolTable->IsBusy = TRUE;
                 Address           = PoolTable->Address;
                 break;
             }
-        });
+        }
+    }
+
+    SpinlockUnlock(&LockForReadingPool);
 
     //
     // Check if we need additional pools e.g another pool or the pool
     // will be available for the next use blah blah
     //
-    if (RequestNewPool)
+    if (RequestNewPool && g_RequestNewAllocation != NULL)
     {
         PoolManagerRequestAllocation(Size, 1, Intention);
     }
