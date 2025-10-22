@@ -19,12 +19,15 @@ typedef struct _MODULE_INFO {
     WCHAR  ModulePath[MODULE_INFO_MAX_CHARS];
 } MODULE_INFO, *PMODULE_INFO;
 
-// 32-bit UNICODE_STRING for WoW64 processes (local minimal definition to avoid conflicts with WDK)
-typedef struct _UNICODE_STRING32_MIN {
+// 32-bit UNICODE_STRING for WoW64 processes
+#ifndef _UNICODE_STRING32_DEFINED
+#define _UNICODE_STRING32_DEFINED
+typedef struct _UNICODE_STRING32 {
     USHORT Length;
     USHORT MaximumLength;
     UINT32 Buffer; // 32-bit pointer
-} UNICODE_STRING32_MIN, *PUNICODE_STRING32_MIN;
+} UNICODE_STRING32, *PUNICODE_STRING32;
+#endif
 
 // Minimal PEB/LDR definitions required for enumeration
 // 64-bit
@@ -78,14 +81,14 @@ typedef struct _LDR_DATA_TABLE_ENTRY64_MIN {
 } LDR_DATA_TABLE_ENTRY64_MIN, *PLDR_DATA_TABLE_ENTRY64_MIN;
 
 typedef struct _LDR_DATA_TABLE_ENTRY32_MIN {
-    LIST_ENTRY32        InLoadOrderLinks;
-    LIST_ENTRY32        InMemoryOrderLinks;
-    LIST_ENTRY32        InInitializationOrderLinks;
-    ULONG               DllBase;
-    ULONG               EntryPoint;
-    ULONG               SizeOfImage;
-    UNICODE_STRING32_MIN FullDllName;
-    UNICODE_STRING32_MIN BaseDllName;
+    LIST_ENTRY32     InLoadOrderLinks;
+    LIST_ENTRY32     InMemoryOrderLinks;
+    LIST_ENTRY32     InInitializationOrderLinks;
+    ULONG            DllBase;
+    ULONG            EntryPoint;
+    ULONG            SizeOfImage;
+    UNICODE_STRING32 FullDllName;
+    UNICODE_STRING32 BaseDllName;
 } LDR_DATA_TABLE_ENTRY32_MIN, *PLDR_DATA_TABLE_ENTRY32_MIN;
 
 // Public interfaces

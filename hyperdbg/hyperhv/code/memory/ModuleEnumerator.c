@@ -23,7 +23,7 @@ static NTSTATUS ReadRemoteMemory64(UINT32 Pid, UINT64 Va, PVOID Buffer, SIZE_T S
 static UINT32 MinU32(UINT32 a, UINT32 b) { return a < b ? a : b; }
 static SIZE_T MinSize(SIZE_T a, SIZE_T b) { return a < b ? a : b; }
 
-static VOID CopyUnicodeFromRemote32(UINT32 Pid, const UNICODE_STRING32_MIN * Src, WCHAR * Dest, UINT32 DestChars)
+static VOID CopyUnicodeFromRemote32(UINT32 Pid, const UNICODE_STRING32 * Src, WCHAR * Dest, UINT32 DestChars)
 {
     if (DestChars == 0)
         return;
