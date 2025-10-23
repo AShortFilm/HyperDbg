@@ -374,7 +374,7 @@ CommandHide(vector<CommandToken> CommandTokens, string Command)
     UINT32  TargetPid;
     BOOLEAN TrueIfProcessIdAndFalseIfProcessName;
 
-#if ActivateHyperEvadeProject == TRUE
+#if ActivateHyperEvadeProject != TRUE
 
     ShowMessages("warning, the !hide command (hyperevade project) is in the Beta phase and is not yet well-tested, "
                  "so it is disabled in this version. If you want to test, you can enable it "
