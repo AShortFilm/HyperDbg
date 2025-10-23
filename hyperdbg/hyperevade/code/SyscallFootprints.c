@@ -55,6 +55,12 @@ TransparentHandleSystemCallHook(GUEST_REGS * Regs)
     UINT64 Context        = Regs->rax;
 
     //
+    // ═══════════════════════════════════════════════════════════════════════════
+    // GLOBAL TRANSPARENT MODE: Whitelist check disabled
+    // ALL processes will be hidden from anti-VM/anti-debug detection
+    // ═══════════════════════════════════════════════════════════════════════════
+    //
+    /*
     // Skip the transparent mitigations of system calls when the caller process
     // is a Windows process that should receive unmodified data
     //
@@ -65,6 +71,7 @@ TransparentHandleSystemCallHook(GUEST_REGS * Regs)
             return;
         }
     }
+    */
 
     if (Context == g_SystemCallNumbersInformation.SysNtQuerySystemInformation ||
         Context == g_SystemCallNumbersInformation.SysNtQuerySystemInformationEx)
