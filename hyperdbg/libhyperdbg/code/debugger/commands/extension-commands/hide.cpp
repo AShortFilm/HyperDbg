@@ -256,6 +256,15 @@ HyperDbgEnableTransparentMode(UINT32 ProcessId, CHAR * ProcessName, BOOLEAN IsPr
     //
     HideRequest.IsHide = TRUE;
 
+    //
+    // Fill system call numbers information for transparent mode
+    //
+    if (!CommandHideFillSystemCalls(&HideRequest.SystemCallNumbersInformation))
+    {
+        ShowMessages("err, unable to get system call numbers\n");
+        return FALSE;
+    }
+
     HideRequest.TrueIfProcessIdAndFalseIfProcessName = IsProcessId;
 
     if (IsProcessId)
@@ -396,21 +405,18 @@ CommandHide(vector<CommandToken> CommandTokens, string Command)
     //
     if (CommandTokens.size() == 1)
     {
-        if (g_ActiveProcessDebuggingState.IsActive)
-        {
-            TrueIfProcessIdAndFalseIfProcessName = TRUE;
-            TargetPid                            = g_ActiveProcessDebuggingState.ProcessId;
-        }
-        else
-        {
-            //
-            // There is no user-debugging process
-            //
-            ShowMessages("you're not attached to any user-mode process, "
-                         "please explicitly specify the process id or process name\n\n");
-            CommandHideHelp();
-            return;
-        }
+        //
+        // No process specified - Enable global transparent mode
+        // Since whitelist check is disabled, this will apply to ALL processes
+        //
+        ShowMessages("enabling global transparent mode (applies to all processes)...\n");
+        
+        //
+        // Use a dummy process ID (0) to indicate global mode
+        // The actual process filtering is disabled in SyscallFootprints.c
+        //
+        TrueIfProcessIdAndFalseIfProcessName = TRUE;
+        TargetPid                            = 0;
     }
     else if (CompareLowerCaseStrings(CommandTokens.at(1), "pid"))
     {
