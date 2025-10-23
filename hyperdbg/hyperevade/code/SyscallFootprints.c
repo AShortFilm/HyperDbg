@@ -55,10 +55,10 @@ TransparentHandleSystemCallHook(GUEST_REGS * Regs)
     UINT64 Context        = Regs->rax;
 
     //
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ===========================================================================
     // GLOBAL TRANSPARENT MODE: Whitelist check disabled
     // ALL processes will be hidden from anti-VM/anti-debug detection
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ===========================================================================
     //
     /*
     // Skip the transparent mitigations of system calls when the caller process
